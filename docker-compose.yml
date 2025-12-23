@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+      # Uncomment if your config enables WebSocket listener
+      # - "9001:9001"
+    volumes:
+      - ./mqtt-config:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  cyrano-to-mqtt:
+    build:
+      context: .
+    image: cyrano-to-mqtt:latest
+    container_name: cyrano-to-mqtt
+    environment:
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+      MQTT_TOPIC_BASE: cyrano
+    depends_on:
+      - mosquitto
+    # UDP listener for Cyrano messages
+    ports:
+      - "50103:50103/udp"
+    restart: unless-stopped

@@ -1,0 +1,13 @@
+# Binaries
+cyrano-to-mqtt
+*.exe
+*.out
+*.log
+
+# Modules
+/vendor/
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/
