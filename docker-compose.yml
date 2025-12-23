@@ -20,6 +20,7 @@ services:
     environment:
       MQTT_BROKER_URL: tcp://mosquitto:1883
       MQTT_TOPIC_BASE: cyrano
+      
     depends_on:
       - mosquitto
     # UDP listener for Cyrano messages
