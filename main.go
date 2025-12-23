@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -30,7 +31,17 @@ func main() {
 	}
 	defer publisher.Close()
 
-	fmt.Println("UDP listener started on port 50103; MQTT connected")
+	// DEBUG logging flag
+	debug := false
+	if v := os.Getenv("DEBUG"); v != "" {
+		if v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "on") {
+			debug = true
+		}
+	}
+
+	if debug {
+		fmt.Println("UDP listener started on port 50103; MQTT connected")
+	}
 
 	// Buffer for receiving messages
 	buffer := make([]byte, 4096)
@@ -50,8 +61,10 @@ func main() {
 			continue
 		}
 
-		// Log parsed message details
-		logMessage(cyranoMsg, remoteAddr)
+		// Log parsed message details (optional via DEBUG)
+		if debug {
+			logMessage(cyranoMsg, remoteAddr)
+		}
 
 		// Publish to MQTT
 		if err := publisher.PublishMessage(cyranoMsg); err != nil {
