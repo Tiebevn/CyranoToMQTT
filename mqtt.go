@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -75,16 +74,79 @@ func (p *MQTTPublisher) PublishMessage(msg *CyranoMessage) error {
 	if p == nil || msg == nil {
 		return nil
 	}
-	topic := fmt.Sprintf("%s/%s/%s", p.topicBase, sanitizeTopic(msg.Piste), msg.Command.String())
-	payload, err := encodeMessageJSON(msg)
-	if err != nil {
-		return err
+
+	// Build base topic: cyrano/{piste}/{command}
+	baseTopic := fmt.Sprintf("%s/%s/%s", p.topicBase, sanitizeTopic(msg.Piste), msg.Command.String())
+
+	// Publish each field to its own topic
+	fields := map[string]string{
+		"protocol":    msg.ProtocolVersion.String(),
+		"command":     msg.Command.String(),
+		"piste":       msg.Piste,
+		"competition": msg.Competition,
+		"phase":       msg.Phase,
+		"poulTab":     msg.PoulTab,
+		"match":       msg.Match,
+		"round":       msg.Round,
+		"time":        msg.Time,
+		"stopwatch":   msg.Stopwatch,
+		"type":        msg.Type.String(),
+		"weapon":      msg.Weapon,
+		"priority":    msg.Priority,
+		"state":       msg.State.String(),
+
+		// Referee information
+		"ref/id":   msg.RefId,
+		"ref/name": msg.RefName,
+		"ref/nat":  msg.RefNat,
+
+		// Right fencer
+		"right/id":      msg.RightId,
+		"right/name":    msg.RightName,
+		"right/nat":     msg.RightNat,
+		"right/score":   msg.RightScore,
+		"right/status":  msg.RightStatus,
+		"right/ycard":   msg.RightYCard,
+		"right/rcard":   msg.RightRCard,
+		"right/light":   msg.RightLight,
+		"right/wlight":  msg.RightWLight,
+		"right/medical": msg.RightMedical,
+		"right/reserve": msg.RightReserve,
+		"right/pcard":   msg.RightPCard,
+
+		// Left fencer
+		"left/id":      msg.LeftId,
+		"left/name":    msg.LeftName,
+		"left/nat":     msg.LeftNat,
+		"left/score":   msg.LeftScore,
+		"left/status":  msg.LeftStatus,
+		"left/ycard":   msg.LeftYCard,
+		"left/rcard":   msg.LeftRCard,
+		"left/light":   msg.LeftLight,
+		"left/wlight":  msg.LeftWLight,
+		"left/medical": msg.LeftMedical,
+		"left/reserve": msg.LeftReserve,
+		"left/pcard":   msg.LeftPCard,
 	}
-	token := p.client.Publish(topic, p.qos, p.retain, payload)
-	if !token.WaitTimeout(5 * time.Second) {
-		return fmt.Errorf("mqtt publish timeout")
+
+	// Publish each field to its own topic
+	for field, value := range fields {
+		// Skip empty values to reduce unnecessary messages
+		if value == "" {
+			continue
+		}
+
+		topic := fmt.Sprintf("%s/%s", baseTopic, field)
+		token := p.client.Publish(topic, p.qos, p.retain, value)
+		if !token.WaitTimeout(5 * time.Second) {
+			return fmt.Errorf("mqtt publish timeout on topic %s", topic)
+		}
+		if err := token.Error(); err != nil {
+			return fmt.Errorf("mqtt publish error on topic %s: %w", topic, err)
+		}
 	}
-	return token.Error()
+
+	return nil
 }
 
 func sanitizeTopic(s string) string {
@@ -95,99 +157,4 @@ func sanitizeTopic(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "-")
 	return s
-}
-
-func encodeMessageJSON(msg *CyranoMessage) ([]byte, error) {
-	type jsonMsg struct {
-		Protocol    string `json:"protocol"`
-		Command     string `json:"command"`
-		Piste       string `json:"piste"`
-		Competition string `json:"competition"`
-		Phase       string `json:"phase"`
-		PoulTab     string `json:"poulTab"`
-		Match       string `json:"match"`
-		Round       string `json:"round"`
-		Time        string `json:"time"`
-		Stopwatch   string `json:"stopwatch"`
-		Type        string `json:"type"`
-		Weapon      string `json:"weapon"`
-		Priority    string `json:"priority"`
-		State       string `json:"state"`
-
-		RefId   string `json:"refId"`
-		RefName string `json:"refName"`
-		RefNat  string `json:"refNat"`
-
-		RightId      string `json:"rightId"`
-		RightName    string `json:"rightName"`
-		RightNat     string `json:"rightNat"`
-		RightScore   string `json:"rightScore"`
-		RightStatus  string `json:"rightStatus"`
-		RightYCard   string `json:"rightYCard"`
-		RightRCard   string `json:"rightRCard"`
-		RightLight   string `json:"rightLight"`
-		RightWLight  string `json:"rightWLight"`
-		RightMedical string `json:"rightMedical"`
-		RightReserve string `json:"rightReserve"`
-		RightPCard   string `json:"rightPCard"`
-
-		LeftId      string `json:"leftId"`
-		LeftName    string `json:"leftName"`
-		LeftNat     string `json:"leftNat"`
-		LeftScore   string `json:"leftScore"`
-		LeftStatus  string `json:"leftStatus"`
-		LeftYCard   string `json:"leftYCard"`
-		LeftRCard   string `json:"leftRCard"`
-		LeftLight   string `json:"leftLight"`
-		LeftWLight  string `json:"leftWLight"`
-		LeftMedical string `json:"leftMedical"`
-		LeftReserve string `json:"leftReserve"`
-		LeftPCard   string `json:"leftPCard"`
-	}
-
-	out := jsonMsg{
-		Protocol:     msg.ProtocolVersion.String(),
-		Command:      msg.Command.String(),
-		Piste:        msg.Piste,
-		Competition:  msg.Competition,
-		Phase:        msg.Phase,
-		PoulTab:      msg.PoulTab,
-		Match:        msg.Match,
-		Round:        msg.Round,
-		Time:         msg.Time,
-		Stopwatch:    msg.Stopwatch,
-		Type:         msg.Type.String(),
-		Weapon:       msg.Weapon,
-		Priority:     msg.Priority,
-		State:        msg.State.String(),
-		RefId:        msg.RefId,
-		RefName:      msg.RefName,
-		RefNat:       msg.RefNat,
-		RightId:      msg.RightId,
-		RightName:    msg.RightName,
-		RightNat:     msg.RightNat,
-		RightScore:   msg.RightScore,
-		RightStatus:  msg.RightStatus,
-		RightYCard:   msg.RightYCard,
-		RightRCard:   msg.RightRCard,
-		RightLight:   msg.RightLight,
-		RightWLight:  msg.RightWLight,
-		RightMedical: msg.RightMedical,
-		RightReserve: msg.RightReserve,
-		RightPCard:   msg.RightPCard,
-		LeftId:       msg.LeftId,
-		LeftName:     msg.LeftName,
-		LeftNat:      msg.LeftNat,
-		LeftScore:    msg.LeftScore,
-		LeftStatus:   msg.LeftStatus,
-		LeftYCard:    msg.LeftYCard,
-		LeftRCard:    msg.LeftRCard,
-		LeftLight:    msg.LeftLight,
-		LeftWLight:   msg.LeftWLight,
-		LeftMedical:  msg.LeftMedical,
-		LeftReserve:  msg.LeftReserve,
-		LeftPCard:    msg.LeftPCard,
-	}
-
-	return json.Marshal(out)
 }
